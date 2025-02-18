@@ -1,0 +1,83 @@
+/*
+REQUIREMENTS
+
+ - Split the Transaction Code to extract the letters at the start of the transaction code. These identify the bank who processes the transaction
+- Rename the new field with the Bank code 'Bank'. 
+- Rename the values in the Online or In-person field, Online of the 1 values and In-Person for the 2 values. 
+- Change the date to be the day of the week
+
+Different levels of detail are required in the outputs. 
+You will need to sum up the values of the transactions in three ways:
+  1. Total Values of Transactions by each bank
+  2. Total Values by Bank, Day of the Week and Type of Transaction (Online or In-Person)
+  3. Total Values by Bank and Customer Code
+
+Output each query
+
+Challenge source: 
+https://preppindata.blogspot.com/2023/01/2023-week-1-data-source-bank.html
+*/
+
+--Check Table
+/*
+SELECT transaction_code
+,value
+,customer_code
+,online_or_in_person
+,transaction_date
+FROM pd2023_wk01
+LIMIT 100;
+
+SELECT count(distinct(transaction_code)) as dist_codes
+,count(transaction_code) as nb_rows
+,online_or_in_person
+FROM pd2023_wk01
+group by online_or_in_person;
+*/
+
+--Get the bank code from the transaction code & Rename
+select
+substring(transaction_code FOR position('-' in transaction_code)-1) as Bank
+from pd2023_wk01
+;
+
+--change online and in-person 
+select
+(case 
+     when online_or_in_person  = 1 then 'Online'
+     when online_or_in_person  = 2 then 'in_Person'
+     end)  as online_or_in_person
+from pd2023_wk01;
+
+--change the date to be day of the week 
+select 
+to_date(transaction_date, 'DD/MM/YYYY') as trans_date
+,extract(DOW from to_date(transaction_date, 'DD/MM/YYYY')) as Day_number
+,to_char(to_date(transaction_date, 'DD/MM/YYYY'), 'Day') as Day_name
+from pd2023_wk01;
+*/
+--output 1
+select 
+sum(value) as total_trans
+,substring(transaction_code FOR position('-' in transaction_code)-1) as Bank
+from pd2023_wk01
+group by Bank;
+
+--output 2
+select 
+sum(value) as total_trans
+,substring(transaction_code for position('-' in transaction_code)-1) as Bank
+,(case when online_or_in_person = 1 then 'Online'
+       when online_or_in_person = 2 then 'In-Person'
+  		end) as online_in_person
+,to_char(to_date(transaction_date, 'DD/MM/YYYY'), 'Day') as week_day
+ from pd2023_wk01
+group by Bank, online_in_person, week_day;
+
+--output 3
+select 
+sum(value) as total_trans
+,substring(transaction_code for position('-' in transaction_code)-1) as Bank
+,customer_code
+from pd2023_wk01
+group by Bank, customer_code
