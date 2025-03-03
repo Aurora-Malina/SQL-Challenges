@@ -1,0 +1,82 @@
+*Challenge completed using snowflake SQL
+/*
+REQUIREMENTS
+For the transactions file:
+- Filter the transactions to just look at DSB 
+  - These will be transactions that contain DSB in the Transaction Code field
+- Rename the values in the Online or In-person field, Online of the 1 values and In-Person for the 2 values
+- Change the date to be the quarter 
+- Sum the transaction values for each quarter and for each Type of Transaction (Online or In-Person)
+
+For the targets file:
+- Pivot the quarterly targets so we have a row for each Type of Transaction and each Quarter (help)
+- Rename the fields
+- Remove the 'Q' from the quarter field and make the data type numeric (help)
+
+Join the two datasets together 
+- You may need more than one join clause!
+
+Remove unnecessary fields
+Calculate the Variance to Target for each row
+
+--CHANGE TRANSACTION DATE TO BE QUARTER AND SUM TRANSACTION VALUES FOR EACH QUARTER AND TYPE OF TRANSACTION
+*/
+SELECT 
+SUM(VALUE) AS TOTAL_TRANSACTIONS
+,(CASE
+  WHEN ONLINE_OR_IN_PERSON = 1 THEN 'In-Person'
+WHEN ONLINE_OR_IN_PERSON = 2 THEN 'Online' END) AS ONLINE_OR_IN_PERS
+,DATE_PART('QUARTER', TO_TIMESTAMP(TRANSACTION_DATE, 'DD/MM/YYYY HH:MI:SS')) AS Q
+,DATE_PART('YEAR', TO_TIMESTAMP(TRANSACTION_DATE, 'DD/MM/YYYY HH:MI:SS')) AS Y
+FROM pd2023_wk01
+WHERE TRANSACTION_CODE LIKE 'DSB%'
+GROUP BY ONLINE_OR_IN_PERS, Q, Y
+;
+
+--TARGETS PIVOT SO WE HAVE ONE ROW FOR EACH TRANSACTION AND QUARTER
+SELECT *
+FROM pd2023_wk03_targets 
+UNPIVOT (TARGETS FOR QUARTS IN(Q1, Q2, Q3, Q4))
+  ;
+
+--RENAME FIELDS, REMOVE Q FROM QUARTER AND ENSURE TARGERS IS NUMERIC
+WITH T_TABLE AS (
+SELECT *
+FROM pd2023_wk03_targets 
+UNPIVOT (TARGETS FOR QUARTS IN(Q1, Q2, Q3, Q4))) 
+SELECT ONLINE_OR_IN_PERSON
+,TO_NUMBER(REPLACE(QUARTS, 'Q', '')) AS QS
+,TARGETS
+FROM T_TABLE
+  ;
+
+--JOIN THE TWO DATASETS TOGETHER - MAY NEED MORE THAN ONE JOIN CLOSE + CALCULATE VARIANCE FROM TARGET
+
+WITH T_TABLE AS ( --CTE FOR TARGETS
+    SELECT *
+    ,TO_NUMBER(REPLACE(QUARTS, 'Q', '')) AS QS
+    FROM pd2023_wk03_targets 
+    UNPIVOT (TARGETS FOR QUARTS IN(Q1, Q2, Q3, Q4)))
+
+,F_TABLE AS ( --CTE FOR TRANSACTIONS
+    SELECT 
+    SUM(VALUE) AS TOTAL_TRANSACTIONS
+    ,(CASE
+        WHEN ONLINE_OR_IN_PERSON = 1 THEN 'In-Person'
+        WHEN ONLINE_OR_IN_PERSON = 2 THEN 'Online' END) AS ONLINE_OR_IN_PERS
+    ,DATE_PART('QUARTER', TO_TIMESTAMP(TRANSACTION_DATE, 'DD/MM/YYYY HH:MI:SS')) AS Q
+    ,DATE_PART('YEAR', TO_TIMESTAMP(TRANSACTION_DATE, 'DD/MM/YYYY HH:MI:SS')) AS Y -- Checked to make sure we only have one year of data.
+FROM pd2023_wk01
+WHERE TRANSACTION_CODE LIKE 'DSB%' --Only kept transactions for one specific bank
+GROUP BY ONLINE_OR_IN_PERS, Q, Y)
+
+SELECT ONLINE_OR_IN_PERSON
+,QS
+,TARGETS
+,TOTAL_TRANSACTIONS
+,TOTAL_TRANSACTIONS - TARGETS AS VARIANCE_FROM_TARGET
+
+FROM T_TABLE INNER JOIN F_TABLE ON T_TABLE.QS = F_TABLE.Q 
+                                AND T_TABLE.ONLINE_OR_IN_PERSON = F_TABLE.ONLINE_OR_IN_PERS
+  ;
+
